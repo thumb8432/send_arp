@@ -6,6 +6,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
+#include <netinet/if_ether.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 
@@ -138,6 +139,24 @@ void makeARPPacket(u_char *packet, struct ether_addr sha, struct ether_addr tha,
     arp_addr->tip = tip;
 }
 
+int cmpHwAddr(struct ether_addr ha1, struct ether_addr ha2)
+{
+    int idx;
+    for(idx=0; idx<ETH_ALEN; idx++)
+    {
+        if(ha1.ether_addr_octet[idx] != ha2.ether_addr_octet[idx])
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int cmpIpAddr(struct in_addr ip1, struct in_addr ip2)
+{
+    return ip1.s_addr != ip2.s_addr;
+}
+
 int main(int argc, char **argv)
 {
     pcap_t                  *handle;
@@ -200,14 +219,17 @@ int main(int argc, char **argv)
         }
 
         eth_hdr = (struct ether_header *) packet;
-        if(eth_hdr->ether_type == htons(ETHERTYPE_ARP))
+        if(eth_hdr->ether_type == htons(ETHERTYPE_ARP) && !cmpHwAddr(*(struct ether_addr *)eth_hdr->ether_dhost, attacker_ha))
         {
             arp_hdr = (struct arphdr *) (packet + sizeof(struct ether_header));
-            if(arp_hdr->ar_pro == htons(ETHERTYPE_IP) && arp_hdr->ar_op == htons(ARPOP_REPLY))
+            if(arp_hdr->ar_hrd == htons(ARPHRD_ETHER) && arp_hdr->ar_pro == htons(ETHERTYPE_IP) && arp_hdr->ar_op == htons(ARPOP_REPLY))
             {
                 arp_addr = (struct arp_addr *) (packet + sizeof(struct ether_header) + sizeof(struct arphdr));
-                victim_ha = arp_addr->sha;
-                break;
+                if(!cmpHwAddr(arp_addr->tha, attacker_ha) && !cmpIpAddr(arp_addr->sip, victim_ip) && !cmpIpAddr(arp_addr->tip, attacker_ip))
+                {
+                    victim_ha = arp_addr->sha;
+                    break;
+                }
             }
         }
     }
