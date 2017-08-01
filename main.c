@@ -215,6 +215,11 @@ int main(int argc, char **argv)
         // timeout
         if(res == 0)
         {
+            if(pcap_sendpacket(handle, arpPacket, sizeof(arpPacket))!=0)
+            {
+                fprintf(stderr, "Couldn't send the packet\n");
+                return -1;
+            }
             continue;
         }
 
